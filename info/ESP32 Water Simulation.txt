@@ -1,0 +1,79 @@
+Intro 
+I developed a working prototype that combines a 2D water simulation with 
+live tilt data from an ESP32-WROOM and an MPU-6050 IMU driven by Matthias Müller’s 
+FLIP (Fluid-Implicit-Particle) method. The demo runs with low latency on a
+breadboard setup and produces a convincing visual effect on an LED matrix
+
+Rather than just following along with fluid sim tutorials, I wanted to see if 
+I could bridge simulation with real hardware input. The challenge was less about
+drawing water and more about wiring a microcontroller, filtering sensor noise, 
+and mapping motion to simulation. This made it a full project that blends math, 
+code, and electronics.
+
+
+Software
+    FLIP implementation
+    Demo 
+    [html fluid simulation]
+    
+        - **Particles**: carry velocity and position (like droplets).
+        - **Grid**: stores a velocity field we can “fix up” to behave like real water (enforce incompressibility).
+
+        ### Simulation Loop (each frame)
+        1. **Integrate particles**
+        - Apply gravity and update velocity/position:
+            v_i += g * dt
+            x_i += v_i * dt
+        - Clamp particles against walls/obstacles.
+
+        2. **Particles → Grid (P2G)**
+        - Scatter particle velocities to nearby grid samples with bilinear weights.
+
+        3. **Make the grid incompressible**
+        - Compute divergence (how much a cell “breathes out”):
+            - Positive → too much outflow
+            - Negative → too much inflow
+        - Solve iteratively (Gauss–Seidel style) to nudge grid velocities until divergence → 0.
+        - This is the step that makes water *look like water*.
+
+        4. **FLIP update (Grid → Particles)**
+        - Instead of replacing particle velocities (PIC), FLIP adds only the change:
+            v_new = v_old + (u_grid_new − u_grid_old)
+        - Preserves small-scale swirling detail.
+        - Blend 90% FLIP + 10% PIC for a balance of detail and stability.
+
+        5. **Two-phase simplification**
+        - Treat air as “nothing” — only solve in water cells (determined by particle presence).
+
+        for each frame:
+            imuTilt = lowpass(readIMU())
+            applyGravity(particles, g + tiltAsAccel(imuTilt))
+            integrateParticles(particles, dt)
+            grid.clear()
+            scatterParticlesToGrid(particles, grid)
+            enforceIncompressibility(grid)   // Gauss–Seidel / Jacobi loops
+            flipUpdate(particles, grid, picBlend=0.1)
+            render(particles or levelset)
+
+
+Hardware prototyping
+    MCU: ESP32-WROOM-32UE (enough horsepower to run the FLIP simulation while driving a display and handling sensor input)
+    IMU: MPU-6050 (gyro + accel) for tilt; I’m fusing to reduce jitter.
+    Display: LED square 
+
+    The simulator runs on an ESP32-WROOM development board. I picked it because it’s inexpensive, well-supported, and powerful enough to push a real-time fluid simulation to a screen.
+    For output I used a 320×240 ILI9341 TFT display over SPI. Each frame the ESP32 computes the new particle positions, builds a grid of active cells, and only redraws what changed—this keeps the updates smooth at ~30 FPS even on microcontroller hardware.
+    For input, the prototype started with a potentiometer wired to GPIO32 as a crude tilt sensor. Rotating the pot changes the gravity vector inside the simulation. I’m replacing that with an MPU-6050 IMU, so the virtual water will respond to physical motion directly.
+    The first version sits on a breadboard with jumper wires. To make the build portable and reliable, I’ve begun laying out a custom PCB that integrates the ESP32, the IMU, and a connector for the TFT.
+
+
+PCB design
+    switched to esp32 S3 wroom, for the easy usb pcb 
+    some pictures
+    using esp32 s3 wroom 1u, mpu6050, and AX (iforgot what it's called) chips
+    wired 8x8 led, controled by x, y coordinates ( might move onto binary encoding later, if proven to be better, idk)
+    on the pcb side i decided to go with two layer of double sided pcb, one holdign the main brain and the sensor, the other holding the led and the chip controlling led
+    this way later if i want to expand i can only switch out the led part, and this also keeps everything compact
+
+    right now i'm waiting for the pcb board to arrive and all the chips so i can solder everything on and contact tests and redesignign to make sure everything is functioning correctly
+    

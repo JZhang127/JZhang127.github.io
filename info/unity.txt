@@ -1,0 +1,31 @@
+project 1
+
+An AI agent trained with Unity ML-Agents to navigate floating platforms and reach a goal.
+It senses the world with ray-based perception, moves with a custom physics controller, and learns through reward shaping.
+
+🧠 Key Features
+
+Perception: two ray sensors to detect ground, obstacles, and checkpoints.
+
+Movement: run, strafe, rotate, and physics-accurate jumping using gravity-based velocity calculation.
+
+Reward System: sequential checkpoint rewards, step/time penalties, and fail triggers to guide efficient learning.
+
+Training Pipeline: custom YAML configuration for network size, learning rate, and decision frequency.
+
+Clean Architecture: modular C# design, easy to adapt to other Unity environments.
+
+🛠️ Tech Stack
+
+Unity · C# · ML-Agents (PPO) · Physics Simulation · Reinforcement Learning
+
+📸 Demo
+
+(Insert GIFs/screenshots here — e.g., agent exploring and jumping between blocks)
+
+🧩 Code Snippet
+public override void OnActionReceived(ActionBuffers actions) {
+    MoveAgent(actions.DiscreteActions);
+    if (actions.DiscreteActions[1] == 1) TryJump();
+    AddReward(MaxStep > 0 ? stepPenalty / MaxStep : stepPenalty * 0.001f);
+}

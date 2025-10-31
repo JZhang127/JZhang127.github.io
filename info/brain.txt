@@ -1,0 +1,49 @@
+I implemented a modular reinforcement learning framework that integrates:
+    Multiple algorithms (Proximal Policy Optimization, Deep Q-Learning).
+    A 2D physics engine supporting collisions, triggers, and dynamic object interactions.
+    An environment API inspired by OpenAI Gym and Unity ML-Agents.
+    Visualization via real-time rendering (pygame) and performance analytics (matplotlib).
+
+The framework allows rapid prototyping of environments and direct comparison of learning algorithms 
+under controlled physical dynamics.
+
+
+
+Learning Agents
+Abstract Agent (agent.py): Defines the contract for action selection, experience storage, and learning.
+
+PPOAgent (ppo.py):
+    Actor–Critic with clipped surrogate objective.
+    Normalized advantage estimation.
+    Entropy regularization for exploration.
+    Mini-batch stochastic gradient descent with adaptive clipping.
+DQNAgent (dqn.py):
+    Deep Q-Network with ε-greedy exploration.
+    Experience replay buffer for decorrelated samples.
+    Target network synchronization for stability.
+Both algorithms are drop-in interchangeable due to the shared base class.
+
+
+
+Core Engine
+    Physics Integration (physics.py): Implements Newtonian dynamics with explicit time integration. Each object is modeled as either static, dynamic, or kinematic, with support for linear forces, restitution, and gravity.
+    Collision Detection & Resolution: Circle–circle, circle–rectangle, and rectangle–rectangle with impulse-based elastic collision response.
+    Trigger Volumes: A specialized class of objects that generate callbacks (on_trigger_enter) without applying physical impulses — useful for defining goals or sensors.
+    
+    pos: position in 2D world.
+    vel: velocity vector.
+    mass: how heavy it is.
+    static: if true → it doesn’t move (like walls).
+    kinematic: controlled directly by code, not physics.
+    is_trigger: doesn’t collide, but fires an event when overlapped.
+    collidable: whether it participates in collisions.
+    restitution: how bouncy it is.
+    apply_force(f): adds force to affect motion.
+    on_trigger_enter(other): callback you can override.
+
+Environment Abstraction
+    Env2D interface (env.py): Mirrors the OpenAI Gym lifecycle (reset, step, observation_space, action_space).
+    Spaces: Discrete (for categorical actions) and continuous Box (for real-valued vectors).
+    VectorSensor: Modular observation construction, enabling composite state representations (positions, velocities, goals, etc.).
+
+

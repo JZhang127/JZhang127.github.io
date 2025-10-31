@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LiveTranscribe · Janice Zhang</title>
+<meta name="description" content="Real-time offline subtitles + translation with a PySide6 UI, Vosk ASR, and MarianMT." />
+<link rel="stylesheet" href="template.css">
+</head>
+<body>
+<header>
+    <div class="nav">
+      <div class="brand">Janice Zhang</div>
+      <nav class="menu" aria-label="Primary">
+        <a href="../index.html">Home</a>
+        <a href="../experience.html">Experience →</a>
+        <a href="../projects.html">Projects →</a>
+        <a href="../about.html">About →</a>
+      </nav>
+    </div>
+  </header>
+
+<main>
+  <h1>LiveTranscribe</h1>
+  <div class="divider"></div>
+
+  <!-- Intro -->
+  <section class="two-col">
+    <div>
+      <h2>Intro</h2>
+      <p>
+        LiveTranscribe is a desktop captioning app. It continuously listens through the microphone, shows a smooth live transcription, and finalizes segments that are immediately translated—everything runs locally.
+      </p>
+      <p>
+        Built with <strong>Vosk</strong> for speech recognition, a custom segmentation pipeline for smoothing, <strong>MarianMT</strong> for instant translation, and a lightweight <strong>PySide6</strong> desktop interface.
+      </p>
+      <a class="btn" href="https://github.com/JZhang127/LiveTranscribe" target="_blank" rel="noopener">View Code on GitHub</a>
+    </div>
+    <section class="demo">
+        <video autoplay loop muted playsinline preload="auto" class="demo-video">
+            <source src="../videos/transcribe1.mp4" type="video/mp4">
+        </video>
+    </section>
+  </section>
+
+
+
+  <div class="divider"></div>
+
+    <!-- Architecture -->
+    <section class="architecture">
+    <h3>Architecture</h3>
+    <p class="pipeline">Mic → ASR (Vosk) → Segmenter → MT (Marian) → UI</p>
+
+    <p>
+      <strong>Audio:</strong> PortAudio callback (<code>sounddevice</code>) pushes
+      <code>float32</code> mono frames into a thread-safe queue.<br>
+      <strong>ASR:</strong> <code>Vosk</code> consumes <code>PCM16</code> bytes and emits
+      <em>partials</em> and <em>finals</em>.<br>
+      <strong>Segmentation:</strong> Small state machine finalizes on <em>silence</em>
+      (~0.6 s), <em>punctuation</em> (.?!,), or <em>word budget</em>.<br>
+      <strong>MT:</strong> Finalized lines pass through <code>MarianMT</code>
+      (<code>opus-mt-{src}-{tgt}</code>) on CPU/GPU.<br>
+      <strong>UI:</strong> Worker threads (<code>QThread</code>) deliver results via Qt
+      signals for main-thread rendering.
+    </p>
+  </section>
+
+
+  <div class="divider"></div>
+
+  <!-- Technical Implementation -->
+  <section class="deep-dive">
+    <h2>Technical Implementation</h2>
+    <p>
+      The app runs three main processes in parallel — audio capture, speech recognition, and translation — all connected through a lightweight streaming loop.
+      Each component runs independently but stays synchronized through a queue-based system, so audio keeps flowing even when the translator or UI takes a moment to update.
+    </p>
+
+    <ul>
+      <li>
+        <strong>Core Engine</strong> – Streams microphone input into small audio chunks and sends them to the recognizer in real time. 
+        It uses silence and punctuation detection to decide when a sentence is complete before sending it for translation.
+      </li>
+
+      <li>
+        <strong>Recognition & Translation</strong> – 
+        Speech is processed locally by the Vosk model for transcription, then passed to MarianMT for translation. 
+        Only finalized lines are translated to keep latency low.
+      </li>
+
+      <li>
+        <strong>User Interface</strong> – 
+        A PySide6 desktop interface displays live subtitles and their translations without delay. 
+        Background threads handle heavy processing while the UI remains fully responsive.
+      </li>
+
+      <li>
+        <strong>Model Management</strong> – 
+        The app automatically downloads and caches offline models for each language.
+        Users can view or delete models directly from the settings page, with built-in protection against locked files.
+      </li>
+    </ul>
+
+    <p>
+      This setup keeps the experience fluid: audio streams in continuously, captions appear almost instantly, and translations show up naturally as each sentence finishes — all without relying on an internet connection.
+    </p>
+  </section>
+
+
+  <div class="divider"></div>
+
+  <!-- Technical Challenges -->
+  <section class="deep-dive">
+    <h2>Technical Challenges</h2>
+    <ul>
+      <li>
+        <strong>Keeping everything in sync.</strong>  
+        The app needed to record audio, transcribe speech, and translate text all at once — without delays or overlaps.  
+        I built a queue-based pipeline that streams audio continuously while partial captions appear in real time.  
+        Each stage runs independently, so translation never stalls the microphone or UI updates.
+      </li>
+
+      <li>
+        <strong>Making it feel “live.”</strong>  
+        Showing every word instantly looked messy, but waiting too long made it feel laggy.  
+        I tuned the segmenting logic to finalize lines only when a short silence, punctuation, or word limit is reached.  
+        That balance made the captions read naturally while still reacting fast to speech.
+      </li>
+
+      <li>
+        <strong>Preventing UI freeze.</strong>  
+        Speech recognition and translation models are heavy — running them directly in the GUI thread caused stuttering.  
+        Moving them into a background worker and using Qt signals to stream updates fixed the issue and kept interactions smooth.
+      </li>
+
+      <li>
+        <strong>Handling model files safely.</strong>  
+        On Windows, large model folders sometimes stayed locked by the ASR process.  
+        I added safe deletion and retry logic so users can remove or refresh models without crashes.
+      </li>
+    </ul>
+  </section>
+
+
+  <div class="divider"></div>
+
+  <!-- Tutorial (Demonstration Only) -->
+  <section class="deep-dive">
+    <h2>Tutorial</h2>
+    
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Actions -->
+  <section class="actions">
+    <a class="btn alt" href="/projects/glucose.html">← Previous: Glucose Forecast</a>
+    <a class="btn alt" href="/projects/fubc.html">Next: Formula UBC →</a>
+  </section>
+</main>
+
+<section id="credits">
+  <div class="footer-bar">
+    <div class="footer-inner">
+      <span>© <span id="y"></span> Janice Zhang</span>
+      <span><a href="/about.html">About</a></span>
+    </div>
+  </div>
+</section>
+
+<!-- <script>
+  document.getElementById('y').textContent = new Date().getFullYear();
+
+  /* replace with your screenshots (kept for visual symmetry with other pages) */
+  const SEQ_FRAMES = [
+    '../images/lts_ui_1.jpg',
+    '../images/lts_ui_2.jpg',
+    '../images/lts_ui_3.jpg'
+  ];
+  const FRAME_MS = 260;
+  const _cache = SEQ_FRAMES.map(src => { const im = new Image(); im.src = src; return im; });
+  const seqImg = document.getElementById('protoSeq');
+  let idx = 0, timer = null;
+  function startSeq(){ if (timer) return; seqImg.src = SEQ_FRAMES[idx]; timer = setInterval(() => { idx = (idx + 1) % SEQ_FRAMES.length; seqImg.src = SEQ_FRAMES[idx]; }, FRAME_MS); }
+  function stopSeq(){ clearInterval(timer); timer = null; }
+  const io = new IntersectionObserver((e)=>{ e[0].isIntersecting ? startSeq() : stopSeq(); }, { threshold: 0.2 });
+  io.observe(seqImg);
+  seqImg.addEventListener('click', () => timer ? stopSeq() : startSeq());
+</script> -->
+
+</body>
+</html>

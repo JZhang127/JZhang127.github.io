@@ -1,0 +1,100 @@
+Okay — super simple, step-by-step, no-jargon explanation coming up. I’ll treat you like you’ve never seen RL before and walk through both algorithms as plainly as possible, with tiny worked examples and minimal math. Ready? Let’s go.
+
+---
+
+# Quick picture first
+You have a little game: a blue circle (agent) moves in a 2D world toward a green circle (goal). After each move you get a number called a **reward** (good if you reach the goal, small negative for each step). The agent’s job: **figure out what actions make rewards bigger**.
+
+Two ways to teach it:
+- **DQN** — agent learns *scores* for each possible action and picks the highest-scoring one (good for a few fixed actions like “up / down / left / right”).
+- **PPO** — agent learns a *way to pick actions* (a distribution), then slowly nudges that way to make good actions more likely (good for continuous actions like “move with velocity [x,y]”).
+
+I’ll explain each like a recipe.
+
+---
+
+## DQN — plain-language recipe (for discrete actions)
+Imagine a table that stores numbers for every combination of “where I am” and “what I do here.” That number is “how good that action is from that spot.” DQN builds a neural network to act like that table.
+
+### How it chooses actions (what it does during play)
+1. Look at the current situation (where you and the goal are).  
+2. Ask the network: “what are the scores for each action?” → you get e.g. `[0.1, -0.2, 0.4, 0.05]`.  
+3. Usually choose the action with the **largest** score. (Sometimes pick random to explore.)
+
+Example: scores `[0.1, -0.2, 0.4, 0.05]` → choose action 3 (score 0.4).
+
+### How it learns / improves (after playing)
+1. Save the last move as a memory: (state, action, reward, next state).  
+2. Sample lots of such memories randomly (so learning is stable).  
+3. For each memory, ask:
+   - “What did I predict before for that action?” (current predicted score)
+   - “What should the score have been?” = immediate reward + best future score from next state.
+4. If your prediction was wrong, adjust the network so its output moves toward the “should have been” number.
+
+Tiny numeric example:
+- You predicted Q = 0.2 for action “right”.
+- After doing it you saw you actually eventually got reward that implies 0.5.
+- Update network so next time Q(right) becomes closer to 0.5.
+
+Repeat thousands of times; scores get more accurate → picking the max becomes good.
+
+---
+
+## PPO — plain-language recipe (for continuous actions)
+PPO doesn’t give scores to actions. Instead it learns **how to pick** actions directly. Think of it as learning a habit / preference: “when I’m here, I usually move slightly up-right.” That habit is probabilistic — it says “80% go right-up-ish, 20% try something else.”
+
+### How it chooses actions (what it does during play)
+1. Look at the current situation (where you and the goal are).  
+2. Actor network says: “my usual move here is `mu` (a preferred vector) and I allow a little randomness `std`.”  
+3. Sample an actual action from that distribution (so it sometimes tries slightly different moves).  
+4. Also, the critic network guesses “how good this state is” (a number).
+
+Example: Actor says `mu = [0.8, 0.6]`, std small; it samples `[0.78, 0.62]` and uses that move.
+
+### How it learns / improves (after playing a batch)
+1. Play many steps (a short episode or a fixed number of steps) and record:
+   - states, actions taken, rewards received, the log-probability of each action (how likely the actor thought that action was), and the critic’s value estimate for each state.
+2. For each time in the rollout compute how much better the result actually was than the critic expected:  
+   - `advantage = (actual future reward) − (critic estimate)`.
+   - If advantage > 0, the action did better than expected; if < 0 it did worse.
+3. Update the actor to **increase** probability of actions that had positive advantage, and **decrease** probability of actions with negative advantage — but **only a little at a time**.
+   - PPO uses a “clipping” rule: if the update would make the policy change too much in a single step, it limits (clips) the change. This keeps learning stable.
+4. Update the critic so its value estimates get closer to the actual future rewards.
+
+Tiny numeric intuition:
+- Actor thought action A had probability 0.1 before (old_logprob). After some gradient step it would be 0.3 (new_logprob) — this is a big change. PPO checks change ratio and **clips** it, preventing the policy from swinging wildly based on noisy samples.
+
+Repeat many rollouts; actor learns to favor actions that tend to give higher returns, critic becomes better at judging states, and the combination stabilizes behavior.
+
+---
+
+## Super-simple analogy
+- DQN: imagine learning by writing a score on flashcards for each “situation + action.” Try an action, see result, rewrite the card score. Over time the best action card stands out.
+- PPO: imagine learning a habit. You try moves and note which felt surprisingly good. If a move worked better than you thought, make it a bit more likely next time. But don’t change your habits too fast — small steps only.
+
+---
+
+## Very short pseudocode (flat, easy)
+
+### DQN (discrete actions)
+```
+initialize Q_network and target_network
+replay_buffer = []
+
+for episode:
+  state = env.reset()
+  while not done:
+    if rand < epsilon: action = random()
+    else: action = argmax(Q_network(state))
+
+    next_state, reward, done = env.step(action)
+    replay_buffer.push(state, action, reward, next_state, done)
+    state = next_state
+
+    if enough samples:
+      sample batch from replay_buffer
+      # compute target = reward + gamma * max(Q_target(next_state))
+      # compute loss = (Q_network(state, action) - target)^2
+      # update Q_network weights to reduce loss
+      occasionally copy Q_network into target_network
+```

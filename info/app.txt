@@ -1,0 +1,233 @@
+A desktop overlay that listens to your microphone, shows live subtitles as you speak or ask a video play
+Built with PySide6, Vosk (Kaldi) for streaming ASR, and Helsinki-NLP Marian for neural MT.
+
+
+Why I built it
+    I wanted something that:
+        floats on top of any app (Zoom, YouTube, lectures, games)
+        real-time translation, captions appear with sub-second latency
+        On-device intelligence: no cloud APIs, no subscriptions, no privacy trade-offs
+        Customizable appearance (font, size, color, opacity)
+    It’s a personal AI interpreter, running locally on your device.
+
+
+Microphone → AI Speech Recognition (Vosk) → Neural Translation (Marian MT) → Instant Captions Overlay (PySide6 GUI)
+
+    1. Audio Processing
+
+    Captures microphone input using sounddevice (PortAudio).
+
+    Configured at 16 kHz sample rate with adjustable block size for low-latency streaming.
+
+    Implements a producer-consumer model:
+
+    Producer: audio callback writes frames into a queue.
+
+    Consumer: processing loop consumes frames in real time.
+
+    2. Automatic Speech Recognition (ASR)
+
+    Integrated Vosk (KaldiRecognizer) for offline, real-time transcription.
+
+    Recognition loop:
+
+    AcceptWaveform() returns finalized transcriptions.
+
+    Otherwise, recognition continues until segmentation triggers.
+
+    Produces clean text segments ready for translation.
+
+    3. Neural Machine Translation (NMT)
+
+    Uses Helsinki-NLP MarianMT models via HuggingFace Transformers.
+
+    Model automatically selected based on src_lang → tgt_lang.
+
+    Optimizations:
+
+    Translation applied only to finalized segments.
+
+    Runs on CPU, with optional CUDA acceleration if available.
+
+    4. Segmentation Strategy
+
+    Implemented a multi-condition segmentation system to produce natural, readable caption units:
+
+    Silence detection (~600 ms threshold based on RMS energy).
+
+    Punctuation flush at . ? ! ,.
+
+    Word-count threshold (default = 5 words).
+
+    This avoids both overly long lines and unnatural breaks.
+
+    5. PySide6 GUI
+
+    MainWindow: frameless, always-on-top, draggable overlay.
+
+    SubtitlePage: live transcript display + controls (Start/Stop, language selection).
+
+    SettingsPage: microphone device picker, segmentation tuning, appearance customization.
+
+    Appearance controls:
+
+    Font family + size
+
+    Text color
+
+    Background opacity (20–100%)
+
+    Threading model: transcription/translation run in a QThread (Worker) with Qt signals to keep the UI responsive.
+
+
+
+
+
+    Code structure
+
+        gui.py — UI + Threading
+
+        Worker(QThread)
+
+        __init__(device_index, src_lang, tgt_lang)
+
+        run()
+
+        vosk_path = ensure_model("vosk-model-small-en-us-0.15")
+
+        ks = KaldiStreamer(..., device_index, src_lang, tgt_lang, sample_rate=16000, hop_ms=200)
+
+        for asr, mt, is_partial in ks.stream_translations(): new_text.emit(asr, mt, is_partial)
+
+        catch PortAudioError / Exception → emit readable error via new_text
+
+        SubtitlePage(QWidget)
+
+        State: history: list[tuple[str, str]]
+
+        Controls: Start/Stop, Settings, Minimize, Close; src_combo, tgt_combo
+
+        start_stream() → create Worker, connect new_text → append_text, start thread
+
+        stop_stream() → terminate/wait worker
+
+        append_text(asr, mt, is_partial)
+
+        if final: history.append((asr, mt))
+
+        rebuild text view from history (+ latest line if partial), auto-scroll
+
+        SettingsPage(QWidget)
+
+        Tabs: Audio(mic picker, chunk size), Behavior(always-on-top, auto-start), Appearance(font, size, color, opacity)
+
+        choose_color() → store chosen color
+
+        apply_settings()
+
+        save mic index → parent.save_settings(dev)
+
+        set window flags (frameless ± always-on-top), show
+
+        apply font/size/color, set opacity
+
+        if auto-start: sub_page.start_stream()
+
+        return to subtitles page
+
+        MainWindow(QMainWindow)
+
+        Frameless, always-on-top; stacked pages: SubtitlePage and (scroll-wrapped) SettingsPage
+
+        Drag-to-move: override mousePress/Move/Release using event.globalPosition()
+
+        show_settings() / show_subtitles()
+
+        save_settings(mic_index) → pass to SubtitlePage
+
+        Entry
+
+        launch(): create QApplication, show MainWindow, app.exec()
+
+        fast_core.py — Streaming Engine
+
+        KaldiStreamer
+
+        __init__(vosk_model_path, src_lang, tgt_lang, sample_rate=16000, hop_ms, device_index, ...)
+
+        Compute blocksize (from hop_ms)
+
+        ASR: Model(vosk_model_path), KaldiRecognizer(model, sample_rate)
+
+        MT: load Helsinki-NLP/opus-mt-{src}-{tgt} (tokenizer + model), pick cpu/cuda
+
+        Audio: sounddevice.InputStream(..., callback=_audio_cb); internal queue.Queue
+
+        Segmentation params: silence threshold/timeout, punctuation flag, word-count limit
+
+        _audio_cb(indata, ...) → enqueue mono float32 frames
+
+        start() / stop() → open/close stream
+
+        _translate(text) → Marian generate(...) → decode
+
+        stream_translations() (core loop)
+
+        while running:
+
+        get audio chunk → PCM16 → AcceptWaveform(...)?
+
+        Yes: parse final text → mt = _translate(text) → yield (text, mt, False) → rec.Reset()
+
+        No: parse partial text; maintain latest; check:
+
+        silence (RMS below threshold for N hops) → flush final
+
+        punctuation (endswith .?!,) → flush final
+
+        word-count (≥ limit) → flush final
+
+        throttled “live” updates: yield (partial, "", True) as needed
+
+        downloader.py — Model Fetching
+
+        MODEL_URLS: name → zip URL (e.g., "vosk-model-small-en-us-0.15" → download link)
+
+        ensure_model(name)
+
+        Anchor base path to Path(sys.executable).parent (fallback __file__)
+
+        Paths: models_dir, model_dir, zip_path
+
+        If model_dir exists → return path
+
+        Else if zip_path exists → extract → return path
+
+        Else:
+
+        stream-download zip to zip_path (progress prints)
+
+        unzip to models_dir
+
+        return model_dir
+
+
+
+
+
+
+Key Engineering Decisions
+    Threading via QThread + signals
+    Keeps the GUI responsive while running continuous audio/ML workloads. Decouples UI from streaming lifecycles.
+
+    Final-only translation
+    MT runs only on finalized segments to avoid wasted compute and semantic drift during speech.
+
+    Multi-trigger segmentation
+    Combining silence, punctuation, and word count yields natural-looking lines with predictable latency.
+
+    Deterministic model paths
+    ensure_model(...) avoids “works on my machine” path issues and makes packaging straightforward.
+
+    Failure-first UX
+    All audio/MT errors surface as readable UI messages; no hard crashes.

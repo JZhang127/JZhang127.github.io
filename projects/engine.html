@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Water Simulation · Janice Zhang</title>
+<meta name="description" content="Water simulation with ESP32 and IMU by Janice Zhang" />
+
+<link rel="stylesheet" href="template.css">
+
+</head>
+<body>
+<header>
+    <div class="nav">
+      <div class="brand">Janice Zhang</div>
+      <nav class="menu" aria-label="Primary">
+        <a href="../index.html">Home</a>
+        <a href="../experience.html">Experience →</a>
+        <a href="../projects.html">Projects →</a>
+        <a href="../about.html">About →</a>
+      </nav>
+    </div>
+  </header>
+
+<main>
+  <h1>AI Training Sandbox</h1>
+
+  <div class="divider"></div>
+
+  <!-- OVERVIEW -->
+  <section class="two-col">
+    <div>
+      <h2>Intro</h2>
+        <p>
+            I built a custom 2D engine inspired by Unity to experiment with AI training environments.
+        </p>
+        <p>
+            It allows me to design small interactive games (like maze-solving or obstacle dodging) and train agents using Deep Q-Learning (DQN), Proximal Policy Optimization (PPO), or Evolutionary Algorithms (EA).
+        </p>
+        <p>
+            The goal was to create a reusable framework to visualize, debug, and compare learning behaviors across algorithms.
+        </p>
+      <a class="btn" href="https://github.com/">View Code on GitHub</a>
+    </div>
+    <figure class="seq">
+        <img id="protoSeq" alt="Water simulation prototype frames" loading="eager">
+    </figure>
+  </section>
+
+
+
+  <div class="divider"></div>
+
+
+  <section class="arch" id="architecture">
+  <div class="arch-header">
+    <h2>Architecture</h2>
+    <div class="sub">Env ↔ Trainer ↔ Agent, with a tiny engine under the hood</div>
+  </div>
+
+  <table class="arch-table">
+    <thead>
+      <tr>
+        <th style="width: 160px;">Layer</th>
+        <th>Responsibilities</th>
+        <th style="width: 280px;">Key Files</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td data-label="Layer"><strong>Engine</strong></td>
+        <td data-label="Responsibilities">
+          Scene graph, primitives, collisions, triggers; fixed-timestep update; simple rendering.
+        </td>
+        <td data-label="Key Files">
+          <span class="file">engine.py</span>
+          <span class="file">physics.py</span>
+        </td>
+      </tr>
+
+      <tr>
+        <td data-label="Layer"><strong>Environment API</strong></td>
+        <td data-label="Responsibilities">
+          Defines <code>reset()</code>, <code>step()</code>, observation &amp; action spaces, reward logic; plugs the engine into RL.
+        </td>
+        <td data-label="Key Files">
+          <span class="file">env.py</span>
+          <span class="file">maze.py</span>
+        </td>
+      </tr>
+
+      <tr>
+        <td data-label="Layer"><strong>Trainer</strong></td>
+        <td data-label="Responsibilities">
+          Main loop, rollout collection, eval schedule, logging/HUD, render toggles.
+        </td>
+        <td data-label="Key Files">
+          <span class="file">trainer.py</span>
+          <span class="file">visualizer.py</span>
+        </td>
+      </tr>
+
+      <tr>
+        <td data-label="Layer"><strong>Agents</strong></td>
+        <td data-label="Responsibilities">
+          Pluggable policies and learning rules (DQN/PPO) plus gradient-free EA; buffers, losses, and updates.
+        </td>
+        <td data-label="Key Files">
+          <span class="file">dqn.py</span>
+          <span class="file">ppo.py</span>
+          <span class="file">ea.py</span>
+          <span class="file">agent.py</span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+
+    <section class="deep-dive">
+  <h2>Core Engine Systems</h2>
+  <p>
+    A lightweight, <strong>Unity-inspired 2D engine</strong> built to power reinforcement-learning environments. 
+    It features a complete physics and collision system, dynamic GameObject creation, and a deterministic, modular design for reproducible training and easy algorithm integration.
+  </p>
+  <ul>
+    <li><strong>Physics & Collisions</strong> – fixed-timestep integrator with contact resolution, restitution, and trigger detection.</li>
+    <li><strong>GameObject Architecture</strong> – each object manages its own transform, collider, and behavior, enabling dynamic creation and removal.</li>
+    <li><strong>Triggers vs. Collisions</strong> – supports non-physical triggers for event detection alongside physical collision responses.</li>
+    <li><strong>Deterministic Simulation</strong> – fixed Δt and seeded random states ensure reproducible environments.</li>
+    <li><strong>Environment API</strong> – unified interface with <code>reset()</code>, <code>step()</code>, and <code>get_obs()</code> for seamless algorithm swapping.</li>
+    <li><strong>Visualization Layer</strong> – built-in rendering and overlays for debugging object motion, collisions, and agent interaction in real time.</li>
+  </ul>
+</section>
+
+  
+    <!-- SOFTWARE -->    
+    <section class="deep-dive">
+        <h2>Algorithms Implemented</h2>
+
+        <h3>Deep Q-Learning (DQN)</h3>
+        <ul>
+            <li>Uses an ε-greedy policy and replay buffer.</li>
+            <li>Implements Double DQN and soft target updates for stability.</li>
+            <li>Suitable for discrete environments like the maze.</li>
+        </ul>
+        <h3>Proximal Policy Optimization (PPO)</h3>
+        <ul>
+            <li>Uses a continuous actor–critic design with GAE (Generalized Advantage Estimation).</li>
+            <li>Implements the clipped surrogate loss and early-stopping by KL divergence.</li>
+            <li>Tested on continuous control environments.</li>
+        </ul>
+        <h3>Evolutionary Algorithm (Cross-Entropy Method)</h3>
+        <ul>
+            <li>Gradient-free approach that evolves policy weights.</li>
+            <li>Samples a population, selects top-performing elites, and updates mean/variance.</li>
+            <li>Good baseline for tasks with sparse rewards.</li>
+        </ul>
+    </section>
+
+  <div class="divider"></div>
+
+
+  
+  
+  <section class="deep-dive">
+    <h2> Result</h2>
+      <section class="demo">
+          <video autoplay loop muted playsinline preload="auto" class="demo-video">
+              <source src="../videos/maze2_final.mp4" type="video/mp4">
+          </video>
+      </section>
+
+
+    <p>
+        The sandbox proved its flexibility by running a full training pipeline end-to-end: environment creation, agent interaction, learning updates, and visualization. Agents trained with DQN, PPO, and EA all converged toward goal-directed behavior within the same physics world — a strong validation of the engine’s modular design.
+    </p>
+    <section class="demo">
+          <video autoplay loop muted playsinline preload="auto" class="demo-video">
+              <source src="../videos/flap.mp4" type="video/mp4">
+          </video>
+      </section>
+    <p>
+        The final system successfully trained agents across multiple algorithms — DQN, PPO, and EA — within the same custom-built engine. Each algorithm learned to solve its respective environment:
+    </p>
+
+    <ul>
+            <li>DQN mastered discrete navigation tasks (e.g., reaching goals in a maze).</li>
+            <li>PPO achieved smooth, stable control in continuous settings.</li>
+            <li>EA evolved workable policies even when gradient signals were sparse or noisy.</li>
+        </ul>
+  </section>
+  <div class="divider"></div>
+
+  <section class="actions">
+    <a class="btn alt" href="water-sim.html">← Previous: Water Simulation</a>
+    <a class="btn alt" href="liveTranscribe.html">Next: LiveTranscribe app →</a>
+  </section>
+</main>
+
+<section id="credits">
+  <div class="footer-bar">
+    <div class="footer-inner">
+      <span>© <span id="y"></span> Janice Zhang</span>
+      <span><a href="/about.html">About</a></span>
+    </div>
+  </div>
+</section>
+
+<script>
+  document.getElementById('y').textContent = new Date().getFullYear();
+
+
+  // Put your 3 image paths here (order = playback order)
+  const SEQ_FRAMES = [
+    '../images/demo1.jpg',
+    '../images/demo2.jpg',
+    '../images/demo3.jpg'
+  ];
+
+  // Tune speed: lower = faster. 90–140 ms feels “bam bam bam”
+  const FRAME_MS = 300;
+
+  // Preload
+  const _cache = SEQ_FRAMES.map(src => { const im = new Image(); im.src = src; return im; });
+
+  const seqImg = document.getElementById('protoSeq');
+  let idx = 0, timer = null;
+
+  function startSeq(){
+    if (timer) return;
+    seqImg.src = SEQ_FRAMES[idx]; // set first frame
+    timer = setInterval(() => {
+      idx = (idx + 1) % SEQ_FRAMES.length;
+      seqImg.src = SEQ_FRAMES[idx];
+    }, FRAME_MS);
+  }
+
+  function stopSeq(){
+    clearInterval(timer); timer = null;
+  }
+
+  // Auto-play when visible, pause when not (saves CPU)
+  const io = new IntersectionObserver((e) => {
+    e[0].isIntersecting ? startSeq() : stopSeq();
+  }, { threshold: 0.2 });
+  io.observe(seqImg);
+
+  // Optional: click to pause/resume
+  seqImg.addEventListener('click', () => timer ? stopSeq() : startSeq());
+</script>
+
+</body>
+</html>
