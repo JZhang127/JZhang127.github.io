@@ -114,6 +114,12 @@
     color: var(--ink);
     transition: color .25s ease;
   }
+.split-half p {
+  color: var(--dark-bg);      /* paragraph color on hover */
+}
+.split-half:hover p {
+  color: var(--light-bg);      /* paragraph color on hover */
+}
   @media (max-width:860px){
     .split-wrap{flex-direction:column}
     .split-half{flex:unset; height:50%;}
